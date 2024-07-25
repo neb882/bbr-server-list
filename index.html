@@ -25,6 +25,10 @@
         th {
             background-color: #2c2c2c;
             color: #fff;
+            cursor: pointer;
+        }
+        th:hover {
+            background-color: #3c3c3c;
         }
         tr:nth-child(even) {
             background-color: #2a2a2a;
@@ -53,9 +57,8 @@
             outline: none;
             box-shadow: 0 0 0 2px #4a90e2;
         }
-        .sort-btn {
-            cursor: pointer;
-            user-select: none;
+        .sort-indicator {
+            margin-left: 5px;
         }
         #nextRefresh {
             font-size: 0.9em;
@@ -84,7 +87,16 @@
         let autoRefreshInterval;
         let nextRefreshTime;
         let allServers = [];
-        let sortOrder = 'desc'; // Default sort order
+        let currentSort = { column: null, order: null };
+
+        const columns = [
+            { key: 'Name', label: 'Name' },
+            { key: 'Map', label: 'Map' },
+            { key: 'Gamemode', label: 'Gamemode' },
+            { key: 'Players', label: 'Players' },
+            { key: 'MaxPlayers', label: 'Max Players' },
+            { key: 'Region', label: 'Region' }
+        ];
 
         async function fetchServers() {
             try {
@@ -107,17 +119,35 @@
         }
 
         function sortServers(servers) {
-            servers.sort((a, b) => {
-                if (sortOrder === 'asc') {
-                    return a.Players - b.Players;
-                } else {
-                    return b.Players - a.Players;
-                }
-            });
+            if (currentSort.column) {
+                servers.sort((a, b) => {
+                    let valueA = a[currentSort.column];
+                    let valueB = b[currentSort.column];
+                    
+                    if (typeof valueA === 'string') {
+                        valueA = valueA.toLowerCase();
+                        valueB = valueB.toLowerCase();
+                    }
+                    
+                    if (valueA < valueB) return currentSort.order === 'asc' ? -1 : 1;
+                    if (valueA > valueB) return currentSort.order === 'asc' ? 1 : -1;
+                    return 0;
+                });
+            }
         }
 
-        function toggleSort() {
-            sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+        function toggleSort(column) {
+            if (currentSort.column === column) {
+                if (currentSort.order === 'asc') {
+                    currentSort.order = 'desc';
+                } else if (currentSort.order === 'desc') {
+                    currentSort.column = null;
+                    currentSort.order = null;
+                }
+            } else {
+                currentSort.column = column;
+                currentSort.order = 'asc';
+            }
             filterServers();
         }
 
@@ -128,29 +158,22 @@
                 return;
             }
 
-            let tableHTML = `
-                <table>
-                    <tr>
-                        <th>Name</th>
-                        <th>Map</th>
-                        <th>Gamemode</th>
-                        <th class="sort-btn" onclick="toggleSort()">Players ${sortOrder === 'asc' ? '▲' : '▼'}</th>
-                        <th>Max Players</th>
-                        <th>Region</th>
-                    </tr>
-            `;
+            let tableHTML = '<table><tr>';
+            columns.forEach(column => {
+                let sortIndicator = '';
+                if (currentSort.column === column.key) {
+                    sortIndicator = currentSort.order === 'asc' ? ' ▲' : ' ▼';
+                }
+                tableHTML += `<th onclick="toggleSort('${column.key}')">${column.label}<span class="sort-indicator">${sortIndicator}</span></th>`;
+            });
+            tableHTML += '</tr>';
 
             servers.forEach(server => {
-                tableHTML += `
-                    <tr>
-                        <td>${server.Name}</td>
-                        <td>${server.Map}</td>
-                        <td>${server.Gamemode}</td>
-                        <td>${server.Players}/${server.MaxPlayers}</td>
-                        <td>${server.MaxPlayers}</td>
-                        <td>${server.Region}</td>
-                    </tr>
-                `;
+                tableHTML += '<tr>';
+                columns.forEach(column => {
+                    tableHTML += `<td>${server[column.key]}</td>`;
+                });
+                tableHTML += '</tr>';
             });
 
             tableHTML += '</table>';
