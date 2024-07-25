@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BattleBit Servers</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #444;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #2c2c2c;
+            color: #fff;
+        }
+        tr:nth-child(even) {
+            background-color: #2a2a2a;
+        }
+        tr:nth-child(odd) {
+            background-color: #323232;
+        }
+        #controls {
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+        }
+        button, input, select {
+            padding: 8px;
+            border: none;
+            border-radius: 4px;
+            background-color: #3a3a3a;
+            color: #e0e0e0;
+        }
+        button:hover, select:hover {
+            background-color: #4a4a4a;
+        }
+        input:focus, select:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px #4a90e2;
+        }
+        .sort-btn {
+            cursor: pointer;
+            user-select: none;
+        }
+        #nextRefresh {
+            font-size: 0.9em;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <h1>BattleBit Servers</h1>
+    <div id="controls">
+        <input type="text" id="mapSearch" placeholder="Enter map name" onkeyup="filterServers()">
+        <button onclick="fetchServers()">Refresh Now</button>
+        <label for="autoRefresh">Auto-refresh:</label>
+        <select id="autoRefresh" onchange="setAutoRefresh()">
+            <option value="0">Disabled</option>
+            <option value="5">Every 5 seconds</option>
+            <option value="10">Every 10 seconds</option>
+            <option value="30">Every 30 seconds</option>
+            <option value="60">Every 60 seconds</option>
+        </select>
+        <span id="nextRefresh"></span>
+    </div>
+    <div id="serverList"></div>
+
+    <script>
+        let autoRefreshInterval;
+        let nextRefreshTime;
+        let allServers = [];
+        let sortOrder = 'desc'; // Default sort order
+
+        async function fetchServers() {
+            try {
+                const response = await fetch('https://publicapi.battlebit.cloud/Servers/GetServerList');
+                allServers = await response.json();
+                filterServers();
+            } catch (error) {
+                console.error('Error fetching server data:', error);
+                document.getElementById('serverList').innerHTML = 'Error fetching server data. Please try again later.';
+            }
+        }
+
+        function filterServers() {
+            const searchTerm = document.getElementById('mapSearch').value.toLowerCase();
+            const filteredServers = allServers.filter(server => 
+                server.Map.toLowerCase().includes(searchTerm)
+            );
+            sortServers(filteredServers);
+            displayServers(filteredServers);
+        }
+
+        function sortServers(servers) {
+            servers.sort((a, b) => {
+                if (sortOrder === 'asc') {
+                    return a.Players - b.Players;
+                } else {
+                    return b.Players - a.Players;
+                }
+            });
+        }
+
+        function toggleSort() {
+            sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+            filterServers();
+        }
+
+        function displayServers(servers) {
+            const serverListElement = document.getElementById('serverList');
+            if (servers.length === 0) {
+                serverListElement.innerHTML = 'No servers found matching the search criteria.';
+                return;
+            }
+
+            let tableHTML = `
+                <table>
+                    <tr>
+                        <th>Name</th>
+                        <th>Map</th>
+                        <th>Gamemode</th>
+                        <th class="sort-btn" onclick="toggleSort()">Players ${sortOrder === 'asc' ? '▲' : '▼'}</th>
+                        <th>Max Players</th>
+                        <th>Region</th>
+                    </tr>
+            `;
+
+            servers.forEach(server => {
+                tableHTML += `
+                    <tr>
+                        <td>${server.Name}</td>
+                        <td>${server.Map}</td>
+                        <td>${server.Gamemode}</td>
+                        <td>${server.Players}/${server.MaxPlayers}</td>
+                        <td>${server.MaxPlayers}</td>
+                        <td>${server.Region}</td>
+                    </tr>
+                `;
+            });
+
+            tableHTML += '</table>';
+            serverListElement.innerHTML = tableHTML;
+        }
+
+        function setAutoRefresh() {
+            clearInterval(autoRefreshInterval);
+            const refreshTime = parseInt(document.getElementById('autoRefresh').value);
+            if (refreshTime > 0) {
+                autoRefreshInterval = setInterval(fetchServers, refreshTime * 1000);
+                startNextRefreshCounter(refreshTime);
+            } else {
+                document.getElementById('nextRefresh').textContent = '';
+            }
+        }
+
+        function startNextRefreshCounter(refreshTime) {
+            nextRefreshTime = refreshTime;
+            updateNextRefreshCounter();
+            setInterval(updateNextRefreshCounter, 1000);
+        }
+
+        function updateNextRefreshCounter() {
+            if (nextRefreshTime > 0) {
+                document.getElementById('nextRefresh').textContent = `Next refresh in ${nextRefreshTime} seconds`;
+                nextRefreshTime--;
+            } else {
+                nextRefreshTime = parseInt(document.getElementById('autoRefresh').value);
+            }
+        }
+
+        fetchServers();
+    </script>
+</body>
+</html>
